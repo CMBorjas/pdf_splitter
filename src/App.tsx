@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dropzone } from './components/Dropzone';
+import { PdfViewer } from './components/PdfViewer';
 import { Layers, Settings, ChevronLeft, AlertCircle } from 'lucide-react';
 import './index.css';
 
@@ -122,18 +123,7 @@ function App() {
               </p>
             </div>
 
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '4rem',
-              border: '1px dashed var(--glass-border)',
-              borderRadius: '12px',
-              color: 'var(--text-muted)'
-            }}>
-              <p>The visual page preview and split controls will be implemented here next!</p>
-            </div>
+            <PdfViewer file={pdfFile} />
           </div>
         )}
       </main>
