@@ -1,122 +1,96 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState } from 'react';
+import { Dropzone } from './components/Dropzone';
+import { Layers, Settings, ChevronLeft } from 'lucide-react';
+import './index.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+
+  const handleReset = () => {
+    setPdfFile(null);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div>
+      <header style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        marginBottom: '3rem',
+        paddingBottom: '1.5rem',
+        borderBottom: '1px solid var(--glass-border)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, var(--brand-cyan), var(--brand-purple))',
+            padding: '0.75rem',
+            borderRadius: '12px',
+            boxShadow: '0 0 20px rgba(0,255,225,0.3)'
+          }}>
+            <Layers color="#fff" size={28} />
+          </div>
+          <h1 className="text-gradient">PDF Splitter Pro</h1>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+        
+        {pdfFile && (
+          <button onClick={handleReset} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ChevronLeft size={18} />
+            Upload Different File
+          </button>
+        )}
+      </header>
 
-      <div className="ticks"></div>
+      <main>
+        {!pdfFile ? (
+          <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 0' }}>
+            <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+              <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+                Secure <span className="text-gradient">Client-Side</span> PDF Editing
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', maxWidth: '600px', margin: '0 auto' }}>
+                Extract, split, and merge your PDF documents directly in your browser. Complete privacy with zero server uploads.
+              </p>
+            </div>
+            
+            <Dropzone onFileAccepted={setPdfFile} />
+          </div>
+        ) : (
+          <div className="glass-panel" style={{ padding: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+              <Settings size={24} color="var(--brand-cyan)" />
+              <h2 style={{ fontSize: '1.8rem' }}>Editor Workspace</h2>
+            </div>
+            
+            <div style={{ 
+              background: 'rgba(0,0,0,0.2)', 
+              borderRadius: '8px', 
+              padding: '1rem',
+              border: '1px solid var(--glass-border)',
+              marginBottom: '2rem'
+            }}>
+              <p><strong>Active File:</strong> {pdfFile.name}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                {(pdfFile.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '4rem',
+              border: '1px dashed var(--glass-border)',
+              borderRadius: '12px',
+              color: 'var(--text-muted)'
+            }}>
+              <p>The visual page preview and split controls will be implemented here next!</p>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
