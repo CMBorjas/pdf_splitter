@@ -10,6 +10,7 @@ This project is a blueprint for a web-based PDF splitting tool inspired by popul
   - **Extract all pages:** Converts every selected page into its own separate PDF document.
   - **Select pages/Ranges:** Allows users to define specific custom ranges (e.g., 1-5, 8, 10-12) to merge into a single new document or split.
 - **Dynamic Summaries:** An information panel calculating the expected output (e.g., "18 PDF will be created").
+- **Embeddable & Theming Ready:** Built as a modular component that utilizes CSS variables, allowing it to be easily integrated into any external website and instantly restyled to match the host's design system.
 
 ## Recommended Tech Stack
 
