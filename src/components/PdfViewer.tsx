@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { X, ZoomIn, Plus, Trash2, Check, Info } from 'lucide-react';
+import { X, ZoomIn, Plus, Trash2, Check, Info, Loader2 } from 'lucide-react';
+import { PDFDocument } from 'pdf-lib';
+import JSZip from 'jszip';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -10,7 +12,7 @@ interface PdfViewerProps {
 }
 
 type SplitMode = 'custom' | 'fixed' | 'smart';
-type PageRange = { id: string; from: number; to: number };
+type PageRange = { id: string; from: number; to: number; name?: string };
 
 // Helper functions for Extract mode
 const parseInputToSet = (input: string, maxPages: number): Set<number> => {
@@ -66,6 +68,7 @@ export function PdfViewer({ file }: PdfViewerProps) {
   const [pdfDocument, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(true);
   const [zoomedPage, setZoomedPage] = useState<number | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const [thumbnailScale, setThumbnailScale] = useState<number>(1);
   
@@ -149,6 +152,10 @@ export function PdfViewer({ file }: PdfViewerProps) {
     setRanges([...ranges, { id: Date.now().toString(), from: 1, to: numPages }]);
   };
 
+  const updateRangeName = (id: string, name: string) => {
+    setRanges(ranges.map(r => r.id === id ? { ...r, name } : r));
+  };
+
   const updateRange = (id: string, field: 'from' | 'to', value: number) => {
     let boundedValue = Math.max(1, Math.min(value, numPages));
     setRanges(ranges.map(r => {
@@ -165,6 +172,136 @@ export function PdfViewer({ file }: PdfViewerProps) {
   const removeRange = (id: string) => {
     if (ranges.length > 1) {
       setRanges(ranges.filter(r => r.id !== id));
+    }
+  };
+
+  const handleSplitPdf = async () => {
+    if (!file || numPages === 0) return;
+    
+    setIsProcessing(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const originalPdfBytes = new Uint8Array(arrayBuffer);
+      const zip = new JSZip();
+      
+      const addPdfToZip = async (pdfDoc: PDFDocument, filename: string) => {
+        const pdfBytes = await pdfDoc.save();
+        zip.file(filename, pdfBytes);
+      };
+
+      if (viewMode === 'range') {
+        if (mergeAll) {
+          const mergedPdf = await PDFDocument.create();
+          const srcDoc = await PDFDocument.load(originalPdfBytes);
+          
+          for (const range of ranges) {
+            const start = Math.max(1, Math.min(range.from, range.to)) - 1;
+            const end = Math.max(range.from, range.to) - 1;
+            const pageIndices = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+            
+            const copiedPages = await mergedPdf.copyPages(srcDoc, pageIndices);
+            copiedPages.forEach(page => mergedPdf.addPage(page));
+          }
+          await addPdfToZip(mergedPdf, 'merged_ranges.pdf');
+        } else {
+          const srcDoc = await PDFDocument.load(originalPdfBytes);
+          for (let i = 0; i < ranges.length; i++) {
+            const range = ranges[i];
+            const newPdf = await PDFDocument.create();
+            const start = Math.max(1, Math.min(range.from, range.to)) - 1;
+            const end = Math.max(range.from, range.to) - 1;
+            const pageIndices = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+            
+            const copiedPages = await newPdf.copyPages(srcDoc, pageIndices);
+            copiedPages.forEach(page => newPdf.addPage(page));
+            
+            const filename = range.name ? `${range.name}.pdf` : `range_${i + 1}_(${range.from}-${range.to}).pdf`;
+            await addPdfToZip(newPdf, filename);
+          }
+        }
+      } else if (viewMode === 'pages') {
+        const srcDoc = await PDFDocument.load(originalPdfBytes);
+        const pagesToProcess = extractMode === 'all' 
+          ? Array.from({ length: numPages }, (_, i) => i + 1)
+          : Array.from(selectedPages).sort((a, b) => a - b);
+          
+        if (pagesToProcess.length === 0) {
+           setIsProcessing(false);
+           alert("Please select at least one page to extract.");
+           return;
+        }
+
+        if (mergeExtract) {
+          const newPdf = await PDFDocument.create();
+          const pageIndices = pagesToProcess.map(p => p - 1);
+          const copiedPages = await newPdf.copyPages(srcDoc, pageIndices);
+          copiedPages.forEach(page => newPdf.addPage(page));
+          await addPdfToZip(newPdf, 'extracted_pages.pdf');
+        } else {
+          for (const pageNum of pagesToProcess) {
+            const newPdf = await PDFDocument.create();
+            const copiedPages = await newPdf.copyPages(srcDoc, [pageNum - 1]);
+            copiedPages.forEach(page => newPdf.addPage(page));
+            await addPdfToZip(newPdf, `page_${pageNum}.pdf`);
+          }
+        }
+      } else if (viewMode === 'size') {
+        const srcDoc = await PDFDocument.load(originalPdfBytes);
+        const maxSizeBytes = parseFloat(maxSizeStr) * (sizeUnit === 'MB' ? 1024 * 1024 : 1024);
+        
+        let currentPdf = await PDFDocument.create();
+        let fileIndex = 1;
+        
+        for (let i = 0; i < numPages; i++) {
+          const testPdf = await PDFDocument.create();
+          
+          if (currentPdf.getPageCount() > 0) {
+            const currentIndices = Array.from({ length: currentPdf.getPageCount() }, (_, j) => j);
+            const copiedCurrentPages = await testPdf.copyPages(currentPdf, currentIndices);
+            copiedCurrentPages.forEach(p => testPdf.addPage(p));
+          }
+          
+          const copiedNextPage = await testPdf.copyPages(srcDoc, [i]);
+          testPdf.addPage(copiedNextPage[0]);
+          
+          const testBytes = await testPdf.save({ useObjectStreams: allowCompression });
+          
+          if (testBytes.length > maxSizeBytes && currentPdf.getPageCount() > 0) {
+             const currentBytes = await currentPdf.save({ useObjectStreams: allowCompression });
+             zip.file(`split_part_${fileIndex}.pdf`, currentBytes);
+             fileIndex++;
+             
+             currentPdf = await PDFDocument.create();
+             const newPage = await currentPdf.copyPages(srcDoc, [i]);
+             currentPdf.addPage(newPage[0]);
+          } else {
+             const pageToAdd = await currentPdf.copyPages(srcDoc, [i]);
+             currentPdf.addPage(pageToAdd[0]);
+          }
+        }
+        
+        if (currentPdf.getPageCount() > 0) {
+          const currentBytes = await currentPdf.save({ useObjectStreams: allowCompression });
+          zip.file(`split_part_${fileIndex}.pdf`, currentBytes);
+        }
+      }
+
+      // Generate Zip and Download
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pdf_splitter_result.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error("Error splitting PDF:", error);
+      alert("An error occurred while processing the PDF.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -324,7 +461,7 @@ export function PdfViewer({ file }: PdfViewerProps) {
                   minWidth: '280px'
                 }}
               >
-                <h4 style={{ margin: '0 0 1rem 0', color: 'var(--brand-cyan)' }}>Range {index + 1}</h4>
+                <h4 style={{ margin: '0 0 1rem 0', color: 'var(--brand-cyan)' }}>{range.name || `Range ${index + 1}`}</h4>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   
                   {/* From Page */}
@@ -440,7 +577,23 @@ export function PdfViewer({ file }: PdfViewerProps) {
                   {ranges.map((range, index) => (
                     <div key={range.id} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: 'bold' }}>Range {index + 1}</span>
+                        <input 
+                          type="text"
+                          value={range.name ?? `Range ${index + 1}`}
+                          onChange={(e) => updateRangeName(range.id, e.target.value)}
+                          placeholder={`Range ${index + 1}`}
+                          style={{ 
+                            fontWeight: 'bold', 
+                            background: 'transparent', 
+                            border: '1px solid transparent',
+                            borderBottom: '1px solid rgba(255,255,255,0.2)',
+                            color: 'white', 
+                            outline: 'none', 
+                            padding: '0.2rem',
+                            width: '180px',
+                            fontSize: '1rem'
+                          }}
+                        />
                         {ranges.length > 1 && (
                           <button onClick={() => removeRange(range.id)} style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', padding: '0.2rem' }}>
                             <Trash2 size={16} />
@@ -505,8 +658,22 @@ export function PdfViewer({ file }: PdfViewerProps) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '0.5rem' }}>
                   <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>Generated Ranges:</h4>
                   {ranges.map((range, index) => (
-                    <div key={range.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                      <span style={{ fontSize: '0.9rem' }}>Range {index + 1}</span>
+                    <div key={range.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                      <input 
+                        type="text"
+                        value={range.name ?? `Range ${index + 1}`}
+                        onChange={(e) => updateRangeName(range.id, e.target.value)}
+                        placeholder={`Range ${index + 1}`}
+                        style={{ 
+                          fontSize: '0.9rem', 
+                          background: 'transparent', 
+                          border: 'none',
+                          borderBottom: '1px dotted rgba(255,255,255,0.3)',
+                          color: 'white', 
+                          outline: 'none',
+                          width: '120px'
+                        }}
+                      />
                       <span style={{ color: 'var(--brand-cyan)', fontWeight: 'bold' }}>{range.from} - {range.to}</span>
                     </div>
                   ))}
@@ -528,14 +695,18 @@ export function PdfViewer({ file }: PdfViewerProps) {
             </div>
 
             <button 
+              onClick={handleSplitPdf}
+              disabled={isProcessing}
               style={{ 
                 width: '100%', padding: '1rem', background: '#E53935', color: 'white', 
                 border: 'none', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold', 
-                cursor: 'pointer', marginTop: 'auto',
-                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)'
+                cursor: isProcessing ? 'not-allowed' : 'pointer', marginTop: 'auto',
+                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)',
+                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem',
+                opacity: isProcessing ? 0.7 : 1
               }}
             >
-              Split PDF
+              {isProcessing ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Split PDF'}
             </button>
           </div>
         )}
@@ -619,14 +790,18 @@ export function PdfViewer({ file }: PdfViewerProps) {
             </div>
 
             <button 
+              onClick={handleSplitPdf}
+              disabled={isProcessing}
               style={{ 
                 width: '100%', padding: '1rem', background: '#E53935', color: 'white', 
                 border: 'none', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold', 
-                cursor: 'pointer', marginTop: 'auto',
-                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)'
+                cursor: isProcessing ? 'not-allowed' : 'pointer', marginTop: 'auto',
+                boxShadow: '0 4px 12px rgba(229, 57, 53, 0.3)',
+                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem',
+                opacity: isProcessing ? 0.7 : 1
               }}
             >
-              Split PDF
+              {isProcessing ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Split PDF'}
             </button>
           </div>
         )}
