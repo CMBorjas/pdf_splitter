@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dropzone } from './components/Dropzone';
 import { PdfViewer } from './components/PdfViewer';
 import { Layers, Settings, ChevronLeft, AlertCircle } from 'lucide-react';
@@ -7,6 +7,14 @@ import './index.css';
 function App() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [rateLimitWarning, setRateLimitWarning] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const theme = params.get('theme');
+    if (theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, []);
 
   const checkRateLimit = () => {
     const now = Date.now();
