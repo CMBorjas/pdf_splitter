@@ -1,6 +1,6 @@
 # PDF Splitter Web Application
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://cmborjas.github.io/pdf_splitter/)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://cmborjas.github.io/projects/pdf-splitter)
 
 ## Overview
 This project is a blueprint for a web-based PDF splitting tool inspired by popular online PDF utilities. It allows users to upload a PDF document, visually preview its pages, and split or extract specific pages into separate PDF files.
