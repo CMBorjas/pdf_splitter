@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Dropzone } from './components/Dropzone';
 import { Layers, Settings, ChevronLeft, AlertCircle } from 'lucide-react';
 import './index.css';
