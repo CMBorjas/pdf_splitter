@@ -64,6 +64,10 @@ const formatSetToInput = (set: Set<number>): string => {
 };
 
 export function PdfViewer({ file }: PdfViewerProps) {
+  const fileStateKey = `pdfSplitterState_${file.name}`;
+  const savedStateStr = localStorage.getItem(fileStateKey);
+  const savedState = savedStateStr ? JSON.parse(savedStateStr) : null;
+
   const [numPages, setNumPages] = useState<number>(0);
   const [pdfDocument, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,22 +77,40 @@ export function PdfViewer({ file }: PdfViewerProps) {
   const [thumbnailScale, setThumbnailScale] = useState<number>(1);
   
   // Range mode state
-  const [viewMode, setViewMode] = useState<'pages' | 'range' | 'size'>('pages'); // Start on 'pages' (Extract mode) based on the image request focus
-  const [rangeMode, setRangeMode] = useState<SplitMode>('custom');
-  const [ranges, setRanges] = useState<PageRange[]>([]);
-  const [mergeAll, setMergeAll] = useState(false);
-  const [fixedAmount, setFixedAmount] = useState<number>(2);
+  const [viewMode, setViewMode] = useState<'pages' | 'range' | 'size'>(savedState?.viewMode || 'pages');
+  const [rangeMode, setRangeMode] = useState<SplitMode>(savedState?.rangeMode || 'custom');
+  const [ranges, setRanges] = useState<PageRange[]>(savedState?.ranges || []);
+  const [mergeAll, setMergeAll] = useState<boolean>(savedState?.mergeAll ?? false);
+  const [fixedAmount, setFixedAmount] = useState<number>(savedState?.fixedAmount || 2);
 
   // Extract mode state
-  const [extractMode, setExtractMode] = useState<'all' | 'select'>('select');
-  const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
-  const [extractInputStr, setExtractInputStr] = useState<string>('');
-  const [mergeExtract, setMergeExtract] = useState(false);
+  const [extractMode, setExtractMode] = useState<'all' | 'select'>(savedState?.extractMode || 'select');
+  const [selectedPages, setSelectedPages] = useState<Set<number>>(savedState?.selectedPages ? new Set(savedState.selectedPages) : new Set());
+  const [extractInputStr, setExtractInputStr] = useState<string>(savedState?.extractInputStr || '');
+  const [mergeExtract, setMergeExtract] = useState<boolean>(savedState?.mergeExtract ?? false);
 
   // Size mode state
-  const [maxSizeStr, setMaxSizeStr] = useState<string>('232');
-  const [sizeUnit, setSizeUnit] = useState<'KB' | 'MB'>('KB');
-  const [allowCompression, setAllowCompression] = useState<boolean>(false);
+  const [maxSizeStr, setMaxSizeStr] = useState<string>(savedState?.maxSizeStr || '232');
+  const [sizeUnit, setSizeUnit] = useState<'KB' | 'MB'>(savedState?.sizeUnit || 'KB');
+  const [allowCompression, setAllowCompression] = useState<boolean>(savedState?.allowCompression ?? false);
+
+  useEffect(() => {
+    const stateToSave = {
+      viewMode,
+      rangeMode,
+      ranges,
+      mergeAll,
+      fixedAmount,
+      extractMode,
+      selectedPages: Array.from(selectedPages),
+      extractInputStr,
+      mergeExtract,
+      maxSizeStr,
+      sizeUnit,
+      allowCompression,
+    };
+    localStorage.setItem(fileStateKey, JSON.stringify(stateToSave));
+  }, [viewMode, rangeMode, ranges, mergeAll, fixedAmount, extractMode, selectedPages, extractInputStr, mergeExtract, maxSizeStr, sizeUnit, allowCompression, fileStateKey]);
 
   useEffect(() => {
     if (rangeMode === 'fixed' && numPages > 0) {
@@ -115,9 +137,7 @@ export function PdfViewer({ file }: PdfViewerProps) {
         setPdfDocument(pdf);
         setNumPages(pdf.numPages);
         
-        if (pdf.numPages > 0) {
-          setRanges([{ id: Date.now().toString(), from: 1, to: pdf.numPages }]);
-        }
+        setRanges(prev => prev.length === 0 && pdf.numPages > 0 ? [{ id: Date.now().toString(), from: 1, to: pdf.numPages }] : prev);
       } catch (error) {
         console.error('Error loading PDF:', error);
       } finally {
