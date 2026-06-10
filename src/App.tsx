@@ -1,10 +1,40 @@
 import React, { useState } from 'react';
 import { Dropzone } from './components/Dropzone';
-import { Layers, Settings, ChevronLeft } from 'lucide-react';
+import { Layers, Settings, ChevronLeft, AlertCircle } from 'lucide-react';
 import './index.css';
 
 function App() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [rateLimitWarning, setRateLimitWarning] = useState<string | null>(null);
+
+  const checkRateLimit = () => {
+    const now = Date.now();
+    const storedData = localStorage.getItem('pdf_rate_limit');
+    let limitData = storedData ? JSON.parse(storedData) : { count: 0, timestamp: now };
+
+    if (now - limitData.timestamp > 60000) {
+      limitData = { count: 1, timestamp: now };
+      localStorage.setItem('pdf_rate_limit', JSON.stringify(limitData));
+      return true;
+    }
+
+    if (limitData.count >= 5) {
+      return false;
+    }
+
+    limitData.count += 1;
+    localStorage.setItem('pdf_rate_limit', JSON.stringify(limitData));
+    return true;
+  };
+
+  const handleFileAccepted = (file: File) => {
+    if (checkRateLimit()) {
+      setRateLimitWarning(null);
+      setPdfFile(file);
+    } else {
+      setRateLimitWarning("Rate limit exceeded! Please wait a minute before processing more files (Limit: 5 per minute).");
+    }
+  };
 
   const handleReset = () => {
     setPdfFile(null);
@@ -52,7 +82,25 @@ function App() {
               </p>
             </div>
             
-            <Dropzone onFileAccepted={setPdfFile} />
+            <Dropzone onFileAccepted={handleFileAccepted} />
+            
+            {rateLimitWarning && (
+              <div style={{
+                marginTop: '2rem',
+                padding: '1rem',
+                backgroundColor: 'rgba(255, 68, 68, 0.1)',
+                border: '1px solid rgba(255, 68, 68, 0.3)',
+                borderRadius: '8px',
+                color: '#ff4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}>
+                <AlertCircle size={20} />
+                <span>{rateLimitWarning}</span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="glass-panel" style={{ padding: '2rem' }}>
